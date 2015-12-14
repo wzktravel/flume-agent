@@ -48,4 +48,21 @@ public class FlumeUtilTest {
     String fileName = FlumeUtil.getFileName(file);
     assertEquals(fileName, "fs-app-center_web_2015120716");
   }
+
+  @Test
+  public void testGetMilliSecondsToNextHour() throws Exception {
+    long milliseconds = FlumeUtil.getMilliSecondsToNextHour();
+    System.out.println(milliseconds);
+  }
+
+  @Test
+  public void testCopyAndRename() throws Exception {
+
+  }
+
+  @Test
+  public void testGetLastHour() throws Exception {
+    String lastHour = FlumeUtil.getLastHour();
+    System.out.println(lastHour);
+  }
 }
