@@ -1,6 +1,7 @@
 package com.firstshare.flume.source;
 
 import com.firstshare.flume.api.IFileListener;
+import com.firstshare.flume.api.IWatchServiceFilter;
 import com.firstshare.flume.watcher.FileModifyWatcher;
 
 import org.apache.flume.Context;
@@ -75,15 +76,14 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
 
     Path watchPath = Paths.get(path);
     FileModifyWatcher watcher = FileModifyWatcher.getInstance();
-    watcher.watch(watchPath, new IFileListener() {
+    watcher.watch(watchPath, new WatchServiceFilter(), new IFileListener() {
       @Override
       public void changed(Path path) {
         File newLastModifiedFile = path.toFile();
         if (lastModifiedFile == null || !newLastModifiedFile.getPath()
             .equals(lastModifiedFile.getPath())) {
           lastModifiedFile = newLastModifiedFile;
-          if (lastModifiedFile != null && lastModifiedFile.exists()
-              && lastModifiedFile.getName().startsWith(filePrefix)) {
+          if (lastModifiedFile != null && lastModifiedFile.exists()) {
             logger.info("Detected new last modified file: {}", lastModifiedFile.getPath());
             restart();
           }
@@ -183,6 +183,24 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
         Thread.currentThread().interrupt();
         logger.error("Error occurred: ", e);
       }
+    }
+  }
+
+  private class WatchServiceFilter implements IWatchServiceFilter {
+
+    @Override
+    public boolean filter(Path path) {
+      if (path == null) {
+        return true;
+      }
+      File file = path.toFile();
+      if (file == null || ! file.isFile()) {
+        return true;
+      }
+      if (file.getName().startsWith(filePrefix)) {
+        return false;
+      }
+      return true;
     }
   }
 

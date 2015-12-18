@@ -1,6 +1,7 @@
 package com.firstshare.flume.watcher;
 
 import com.firstshare.flume.api.IFileListener;
+import com.firstshare.flume.api.IWatchServiceFilter;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import org.slf4j.Logger;
@@ -27,6 +28,8 @@ public class FileModifyWatcher implements Runnable {
 
   private WatchService watchService;
   private IFileListener fileListener;
+  private IWatchServiceFilter watchServiceFilter;
+
   private WatchEvent.Kind[] watchEvents = {ENTRY_CREATE, ENTRY_MODIFY};
   private boolean running = false;
 
@@ -47,10 +50,11 @@ public class FileModifyWatcher implements Runnable {
    * @param listener 文件变更时执行{@link IFileListener#changed(Path)}
    * @throws IOException
    */
-  public void watch(Path dir, IFileListener listener) {
+  public void watch(Path dir, IWatchServiceFilter filter, IFileListener listener) {
     try {
       dir.register(watchService, watchEvents, SensitivityWatchEventModifier.HIGH);
       fileListener = listener;
+      watchServiceFilter = filter;
       LOG.info("monitor directory {}", dir);
     } catch (Exception e) {
       LOG.error("cannot register path {}", dir, e);
@@ -81,6 +85,10 @@ public class FileModifyWatcher implements Runnable {
           WatchEvent<Path> ev = cast(event);
           Path name = ev.context();
           Path child = dir.resolve(name);
+
+          if (watchServiceFilter.filter(child)) {
+            continue;
+          }
 
           if (fileListener == null) {
             LOG.error("no file listener found");
