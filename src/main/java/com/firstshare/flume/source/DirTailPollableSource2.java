@@ -1,5 +1,7 @@
 package com.firstshare.flume.source;
 
+import com.google.common.base.Strings;
+
 import com.firstshare.flume.api.IFileListener;
 import com.firstshare.flume.api.IWatchServiceFilter;
 import com.firstshare.flume.watcher.FileModifyWatcher;
@@ -35,10 +37,12 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class DirTailPollableSource2 extends AbstractSource implements Configurable, PollableSource {
 
   private static final Logger logger = LoggerFactory.getLogger(DirTailPollableSource2.class);
+  private static final char SPLITER = '\u0001';
 
   private String path;
   private String filePrefix;
   private boolean debugThroughput;
+  private String appName;
 
   private Timer throughputTimer;
 
@@ -55,16 +59,12 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
 
   @Override
   public void configure(Context context) {
-    String path = context.getString("path", "/tmp");
-    String filePrefix = context.getString("filePrefix", "");
-    long scanPeriod = context.getLong("scanPeriod", 1000L);
-    boolean debugThroughput = context.getBoolean("debugThroughput", false);
+    this.path = context.getString("path", "/tmp");
+    this.filePrefix = context.getString("filePrefix", "");
+    this.debugThroughput = context.getBoolean("debugThroughput", false);
+    this.appName = context.getString("appName", "");
 
-    this.path = path;
-    this.filePrefix = filePrefix;
-    this.debugThroughput = debugThroughput;
-
-    queue = new LinkedBlockingQueue<String>();
+    this.queue = new LinkedBlockingQueue<String>();
   }
 
   @Override
@@ -147,6 +147,9 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
     channelProcessor = getChannelProcessor();
     try {
       String line = queue.take();
+      if (!Strings.isNullOrEmpty(appName)) {
+        line += (SPLITER + appName);
+      }
       Event e = EventBuilder.withBody(line.getBytes());
       channelProcessor.processEvent(e);
     } catch (Throwable t) {
