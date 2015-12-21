@@ -1,9 +1,10 @@
 package com.firstshare.flume.source;
 
+import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 
 import com.firstshare.flume.api.IFileListener;
-import com.firstshare.flume.api.IWatchServiceFilter;
+import com.firstshare.flume.service.WatchServiceFilter;
 import com.firstshare.flume.watcher.FileModifyWatcher;
 
 import org.apache.flume.Context;
@@ -60,7 +61,7 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
   @Override
   public void configure(Context context) {
     this.path = context.getString("path", "/tmp");
-    this.filePrefix = context.getString("filePrefix", "");
+    filePrefix = context.getString("filePrefix", "");
     this.debugThroughput = context.getBoolean("debugThroughput", false);
     this.appName = context.getString("appName", "");
 
@@ -75,8 +76,8 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
     channelProcessor = getChannelProcessor();
 
     Path watchPath = Paths.get(path);
-    FileModifyWatcher watcher = FileModifyWatcher.getInstance();
-    watcher.watch(watchPath, new WatchServiceFilter(), new IFileListener() {
+    FileModifyWatcher watcher = FileModifyWatcher.newInstance();
+    watcher.watch(watchPath, new WatchServiceFilter(filePrefix), new IFileListener() {
       @Override
       public void changed(Path path) {
         File newLastModifiedFile = path.toFile();
@@ -84,7 +85,8 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
             .equals(lastModifiedFile.getPath())) {
           lastModifiedFile = newLastModifiedFile;
           if (lastModifiedFile != null && lastModifiedFile.exists()) {
-            logger.info("Detected new last modified file: {}", lastModifiedFile.getPath());
+            logger.info("Thread {} detected new last modified file: {}",
+                        Thread.currentThread().getName(), lastModifiedFile.getPath());
             restart();
           }
         }
@@ -98,7 +100,7 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
 
         public void run() {
           throughput = totalCount - beforeTotalCount;
-          logger.debug("totalCount= {}, throughput= {}", totalCount, throughput);
+          logger.info("totalCount= {}, throughput= {}", totalCount, throughput);
           beforeTotalCount = totalCount;
         }
       }, 0L, 1000);
@@ -184,27 +186,7 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
         }
       } catch (Exception e) {
         Thread.currentThread().interrupt();
-        logger.error("Error occurred: ", e);
       }
     }
   }
-
-  private class WatchServiceFilter implements IWatchServiceFilter {
-
-    @Override
-    public boolean filter(Path path) {
-      if (path == null) {
-        return true;
-      }
-      File file = path.toFile();
-      if (file == null || ! file.isFile()) {
-        return true;
-      }
-      if (file.getName().startsWith(filePrefix)) {
-        return false;
-      }
-      return true;
-    }
-  }
-
 }

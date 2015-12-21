@@ -3,11 +3,10 @@ package com.firstshare.flume.source;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.google.common.io.Files;
 
+import com.firstshare.flume.service.FileHandlerRunnable;
 import com.firstshare.flume.utils.FlumeUtil;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.flume.ChannelException;
 import org.apache.flume.Context;
 import org.apache.flume.Event;
@@ -24,48 +23,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static com.firstshare.flume.source.SpoolDirectoryHourlySourceConfigurationConstants.DEFAULT_FILE_PREFIX;
-import static com.firstshare.flume.source.SpoolDirectoryHourlySourceConfigurationConstants.FILE_PREFIX;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.BASENAME_HEADER;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.BASENAME_HEADER_KEY;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.BATCH_SIZE;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.BUFFER_MAX_LINE_LENGTH;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.CONSUME_ORDER;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DECODE_ERROR_POLICY;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_BASENAME_HEADER;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_BASENAME_HEADER_KEY;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_BATCH_SIZE;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_CONSUME_ORDER;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_DECODE_ERROR_POLICY;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_DELETE_POLICY;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_DESERIALIZER;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_FILENAME_HEADER_KEY;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_FILE_HEADER;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_IGNORE_PAT;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_INPUT_CHARSET;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_MAX_BACKOFF;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_SPOOLED_FILE_SUFFIX;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DEFAULT_TRACKER_DIR;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DELETE_POLICY;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.DESERIALIZER;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.FILENAME_HEADER;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.FILENAME_HEADER_KEY;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.IGNORE_PAT;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.INPUT_CHARSET;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.MAX_BACKOFF;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.SPOOLED_FILE_SUFFIX;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.SPOOL_DIRECTORY;
-import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.TRACKER_DIR;
-import static com.firstshare.flume.source.SpoolDirectoryHourlySourceConfigurationConstants.LOG_DIRECTORY;
-import static com.firstshare.flume.source.SpoolDirectoryHourlySourceConfigurationConstants.ROLL_MINUTES;
-import static com.firstshare.flume.source.SpoolDirectoryHourlySourceConfigurationConstants.DEFAULT_ROOL_MINUTES;
+import static org.apache.flume.source.SpoolDirectorySourceConfigurationConstants.*;
+import static com.firstshare.flume.source.SpoolDirectoryHourlySourceConfigurationConstants.*;
 
 /**
  * 基于SpoolDirectorySource,能每小时从logDir中将上一个小时的日志复制到spoolDir中
@@ -100,12 +65,16 @@ public class SpoolDirectoryHourlySource extends AbstractSource
   private String logDir;
   private String filePrefix;
   private int rollMinutes;
+  private String fileCompressionMode;
+  private int fileMaxHistory;
+
   private volatile boolean hasFatalError = false;
 
   private SourceCounter sourceCounter;
   ReliableSpoolingFileEventReader reader;
   private ScheduledExecutorService executor;
-  private ScheduledExecutorService copyAndRenameExcecutor;
+  private FileHandlerRunnable fileHandler;
+  private ScheduledExecutorService fileHandleExcutor;
   private boolean backoff = true;
   private boolean hitChannelException = false;
   private int maxBackoff;
@@ -115,7 +84,7 @@ public class SpoolDirectoryHourlySource extends AbstractSource
   public synchronized void start() {
     logger.info("SpoolDirectorySource source starting with directory: {}", spoolDirectory);
 
-    copyAndRenameExcecutor = Executors.newSingleThreadScheduledExecutor();
+    fileHandleExcutor = Executors.newSingleThreadScheduledExecutor();
     executor = Executors.newSingleThreadScheduledExecutor();
 
     File directory = new File(spoolDirectory);
@@ -141,8 +110,9 @@ public class SpoolDirectoryHourlySource extends AbstractSource
     }
 
     long millisecondsToNextHour = FlumeUtil.getMilliSecondsToNextHour() + rollMinutes * 60 * 1000;
-    Runnable copyAndRenameRunner = new CopyAndRenameRunnable();
-    copyAndRenameExcecutor.scheduleAtFixedRate(copyAndRenameRunner, millisecondsToNextHour,
+    fileHandler = new FileHandlerRunnable(logDir, spoolDirectory, filePrefix, completedSuffix,
+                                          fileCompressionMode, fileMaxHistory);
+    fileHandleExcutor.scheduleAtFixedRate(fileHandler, millisecondsToNextHour,
                                                ROLL_DELAY_MS, TimeUnit.MILLISECONDS);
 
     Runnable runner = new SpoolDirectoryRunnable(reader, sourceCounter);
@@ -155,16 +125,17 @@ public class SpoolDirectoryHourlySource extends AbstractSource
 
   @Override
   public synchronized void stop() {
+    fileHandler.waitForAsynchronousJobToStop();
     executor.shutdown();
-    copyAndRenameExcecutor.shutdown();
+    fileHandleExcutor.shutdown();
     try {
       executor.awaitTermination(10L, TimeUnit.SECONDS);
-      copyAndRenameExcecutor.awaitTermination(10L, TimeUnit.SECONDS);
+      fileHandleExcutor.awaitTermination(10L, TimeUnit.SECONDS);
     } catch (InterruptedException ex) {
       logger.info("Interrupted while awaiting termination", ex);
     }
     executor.shutdownNow();
-    copyAndRenameExcecutor.shutdownNow();
+    fileHandleExcutor.shutdownNow();
 
     super.stop();
     sourceCounter.stop();
@@ -186,19 +157,13 @@ public class SpoolDirectoryHourlySource extends AbstractSource
     Preconditions.checkState(spoolDirectory != null,
                              "Configuration must specify a spooling directory");
 
-    completedSuffix = context.getString(SPOOLED_FILE_SUFFIX,
-                                        DEFAULT_SPOOLED_FILE_SUFFIX);
+    completedSuffix = context.getString(SPOOLED_FILE_SUFFIX, DEFAULT_SPOOLED_FILE_SUFFIX);
     deletePolicy = context.getString(DELETE_POLICY, DEFAULT_DELETE_POLICY);
-    fileHeader = context.getBoolean(FILENAME_HEADER,
-                                    DEFAULT_FILE_HEADER);
-    fileHeaderKey = context.getString(FILENAME_HEADER_KEY,
-                                      DEFAULT_FILENAME_HEADER_KEY);
-    basenameHeader = context.getBoolean(BASENAME_HEADER,
-                                        DEFAULT_BASENAME_HEADER);
-    basenameHeaderKey = context.getString(BASENAME_HEADER_KEY,
-                                          DEFAULT_BASENAME_HEADER_KEY);
-    batchSize = context.getInteger(BATCH_SIZE,
-                                   DEFAULT_BATCH_SIZE);
+    fileHeader = context.getBoolean(FILENAME_HEADER, DEFAULT_FILE_HEADER);
+    fileHeaderKey = context.getString(FILENAME_HEADER_KEY, DEFAULT_FILENAME_HEADER_KEY);
+    basenameHeader = context.getBoolean(BASENAME_HEADER, DEFAULT_BASENAME_HEADER);
+    basenameHeaderKey = context.getString(BASENAME_HEADER_KEY, DEFAULT_BASENAME_HEADER_KEY);
+    batchSize = context.getInteger(BATCH_SIZE, DEFAULT_BATCH_SIZE);
     inputCharset = context.getString(INPUT_CHARSET, DEFAULT_INPUT_CHARSET);
     decodeErrorPolicy = DecodeErrorPolicy.valueOf(
         context.getString(DECODE_ERROR_POLICY, DEFAULT_DECODE_ERROR_POLICY)
@@ -208,20 +173,17 @@ public class SpoolDirectoryHourlySource extends AbstractSource
     trackerDirPath = context.getString(TRACKER_DIR, DEFAULT_TRACKER_DIR);
 
     deserializerType = context.getString(DESERIALIZER, DEFAULT_DESERIALIZER);
-    deserializerContext = new Context(context.getSubProperties(DESERIALIZER +
-                                                               "."));
+    deserializerContext = new Context(context.getSubProperties(DESERIALIZER + "."));
 
     consumeOrder = SpoolDirectorySourceConfigurationConstants.ConsumeOrder
-        .valueOf(context.getString(CONSUME_ORDER,
-                                   DEFAULT_CONSUME_ORDER.toString()).toUpperCase());
+        .valueOf(context.getString(CONSUME_ORDER, DEFAULT_CONSUME_ORDER.toString()).toUpperCase());
 
     // "Hack" to support backwards compatibility with previous generation of
     // spooling directory source, which did not support deserializers
     Integer bufferMaxLineLength = context.getInteger(BUFFER_MAX_LINE_LENGTH);
     if (bufferMaxLineLength != null && deserializerType != null &&
         deserializerType.equalsIgnoreCase(DEFAULT_DESERIALIZER)) {
-      deserializerContext.put(LineDeserializer.MAXLINE_KEY,
-                              bufferMaxLineLength.toString());
+      deserializerContext.put(LineDeserializer.MAXLINE_KEY, bufferMaxLineLength.toString());
     }
 
     maxBackoff = context.getInteger(MAX_BACKOFF, DEFAULT_MAX_BACKOFF);
@@ -231,7 +193,8 @@ public class SpoolDirectoryHourlySource extends AbstractSource
 
     filePrefix = context.getString(FILE_PREFIX, DEFAULT_FILE_PREFIX);
     rollMinutes = context.getInteger(ROLL_MINUTES, DEFAULT_ROOL_MINUTES);
-
+    fileCompressionMode = context.getString(FILE_COMPRESSIONMODE, DEFAULT_FILE_COMPRESSIONMODE);
+    fileMaxHistory = context.getInteger(FILE_MAXHISTORY, DEFAULT_FILE_MAXHISTORY);
   }
 
   @VisibleForTesting
@@ -312,66 +275,6 @@ public class SpoolDirectoryHourlySource extends AbstractSource
         hasFatalError = true;
         Throwables.propagate(t);
       }
-    }
-  }
-
-  private class CopyAndRenameRunnable implements Runnable {
-
-    @Override
-    public void run() {
-      File logPath = new File(logDir);
-      String[] logs = new String[0];
-      if (logPath.isDirectory()) {
-        logs = logPath.list(new LogFilenameFilter());
-      }
-      if (logs == null || logs.length < 1) {
-        logger.warn("no matched logs found in {}", logDir);
-        return;
-      }
-      for (String from : logs) {
-        String copyFrom = logDir + "/" + from;
-        String copyTo = spoolDirectory + "/" + from + completedSuffix;
-        String moveTo = spoolDirectory + "/" + from;
-        File copySrcFile = new File(copyFrom);
-        File copyDstFile = new File(copyTo);
-        File moveDstFile = new File(moveTo);
-        try {
-          Files.copy(copySrcFile, copyDstFile);
-          logger.info("copy file {} to {}.", from, copyTo);
-        } catch (IOException e) {
-          logger.error("connot copy file {} to {}.", from, copyTo);
-        }
-        try {
-          Files.move(copyDstFile, moveDstFile);
-          logger.info("move file {} to {}.", copyTo, moveTo);
-        } catch (IOException e) {
-          logger.error("connot move file {} to {}.", copyTo, moveTo);
-        }
-      }
-    }
-  }
-
-  private class LogFilenameFilter implements FilenameFilter {
-
-    /**
-     * 匹配前缀, 不匹配后缀, 日期符合
-     * @param dir
-     * @param name
-     * @return
-     */
-    @Override
-    public boolean accept(File dir, String name) {
-      if (StringUtils.isEmpty(name) || !StringUtils.startsWith(name, filePrefix)) {
-        return false;
-      }
-      if (StringUtils.endsWith(name, completedSuffix)) {
-        return false;
-      }
-      String lastHour = FlumeUtil.getLastHour();
-      if (StringUtils.contains(name, lastHour)) {
-        return true;
-      }
-      return false;
     }
   }
 

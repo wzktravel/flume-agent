@@ -1,13 +1,9 @@
 package com.firstshare.flume.utils;
 
-import com.google.common.io.Files;
-
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
@@ -23,7 +19,8 @@ public class FlumeUtil {
 
   private static final Logger log = LoggerFactory.getLogger(FlumeUtil.class);
 
-  private static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddHH");
+  private static final SimpleDateFormat dateWithHourFormat = new SimpleDateFormat("yyyyMMddHH");
+  private static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd");
   private static final Pattern datePattern = Pattern.compile("\\d{4}\\d{2}\\d{2}\\d{2}");
 
 
@@ -48,7 +45,7 @@ public class FlumeUtil {
   }
 
   public static String getFormatTimeForNow() {
-    return dateFormat.format(new Date());
+    return dateWithHourFormat.format(new Date());
   }
 
   public static String getFileName(String file) {
@@ -64,21 +61,16 @@ public class FlumeUtil {
     return ss;
   }
 
-  public static String getLastHour() {
+  public static String getLastHourWithDate() {
     Calendar c = Calendar.getInstance();
     c.add(Calendar.HOUR, -1);
-    return dateFormat.format(c.getTime());
+    return dateWithHourFormat.format(c.getTime());
   }
 
-  public static boolean copyAndRename(String file, String path) {
-    try {
-      Files.copy(new File(file), new File(path));
-      Files.move(new File(path), new File(file));
-    } catch (IOException e) {
-      e.printStackTrace();
-      return false;
-    }
-    return true;
+  public static String getDayBefore(int day) {
+    Calendar c = Calendar.getInstance();
+    c.add(Calendar.DATE, 0 - day);
+    return dateFormat.format(c.getTime());
   }
 
 }

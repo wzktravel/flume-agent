@@ -62,7 +62,13 @@ public class FlumeUtilTest {
 
   @Test
   public void testGetLastHour() throws Exception {
-    String lastHour = FlumeUtil.getLastHour();
+    String lastHour = FlumeUtil.getLastHourWithDate();
     System.out.println(lastHour);
+  }
+
+  @Test
+  public void testGetDayBefore() throws Exception {
+    String day = FlumeUtil.getDayBefore(7);
+    System.out.println(day);
   }
 }

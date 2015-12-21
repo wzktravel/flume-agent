@@ -33,8 +33,8 @@ public class FileModifyWatcher implements Runnable {
   private WatchEvent.Kind[] watchEvents = {ENTRY_CREATE, ENTRY_MODIFY};
   private boolean running = false;
 
-  public static FileModifyWatcher getInstance() {
-    return LazyHolder.instance;
+  public static FileModifyWatcher newInstance() {
+    return LazyHolder.create();
   }
 
   private FileModifyWatcher() {
@@ -123,9 +123,7 @@ public class FileModifyWatcher implements Runnable {
   }
 
   private static final class LazyHolder {
-    private static final FileModifyWatcher instance = create();
-
-    private static FileModifyWatcher create() {
+    static FileModifyWatcher create() {
       FileModifyWatcher watcher = new FileModifyWatcher();
       watcher.start();
       return watcher;

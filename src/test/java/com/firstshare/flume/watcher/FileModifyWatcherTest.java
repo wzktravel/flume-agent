@@ -4,6 +4,7 @@ import com.google.common.io.Files;
 
 import com.firstshare.flume.api.IFileListener;
 import com.firstshare.flume.api.IWatchServiceFilter;
+import com.firstshare.flume.service.WatchServiceFilter;
 
 import org.junit.Ignore;
 import org.junit.Test;
@@ -27,13 +28,13 @@ public class FileModifyWatcherTest {
   @Test
   public void testWatch() throws Exception {
 
-    FileModifyWatcher watcher = FileModifyWatcher.getInstance();
+    FileModifyWatcher watcher = FileModifyWatcher.newInstance();
     File tmpDir = Files.createTempDir();
     System.out.println(tmpDir);
     File aTxt = tmpDir.toPath().resolve("a.txt").toFile();
 
     try {
-      watcher.watch(tmpDir.toPath(), new WatchServiceFilter(), new IFileListener() {
+      watcher.watch(tmpDir.toPath(), new WatchServiceFilter(filePrefix), new IFileListener() {
         @Override
         public void changed(Path path) {
           System.out.println(path);
@@ -76,22 +77,5 @@ public class FileModifyWatcherTest {
     }
   }
 
-  private class WatchServiceFilter implements IWatchServiceFilter {
-
-    @Override
-    public boolean filter(Path path) {
-      if (path == null) {
-        return true;
-      }
-      File file = path.toFile();
-      if (file == null || ! file.isFile()) {
-        return true;
-      }
-      if (file.getName().startsWith(filePrefix)) {
-        return false;
-      }
-      return true;
-    }
-  }
 }
 
