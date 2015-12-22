@@ -16,7 +16,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 对HDFS sink的interceptor, 在header中加入时间,文件名,ip. Created by wangzk on 2015/12/08.
+ * 对HDFS sink的interceptor, 在header中加入时间,文件名,ip.
+ * Created by wangzk on 2015/12/08.
  */
 public class HDFSInterceptor implements Interceptor {
 
