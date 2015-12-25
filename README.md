@@ -104,7 +104,8 @@ a1.sinks.hdfs-sink.hdfs.codeC = com.hadoop.compression.lzo.LzopCodec
 1. 确保hadoop集群已经开启HA机制。
 2. 将集群中`hdfs-site.xml`放在`flume/conf`下。
 3. `hdfs-site.xml`中有许多是vlnx107009等形式的，要替换回ip。
-4. flume的hdfs sink中配置
+4. 注意线上线下集群xml不同
+5. flume的hdfs sink中配置
 
 ```
 ## 修改前

@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -186,6 +187,13 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
         }
       } catch (Exception e) {
         Thread.currentThread().interrupt();
+      } finally {
+        if (randomFile != null) {
+          try {
+            randomFile.close();
+          } catch (IOException e1) {
+          }
+        }
       }
     }
   }
