@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -87,7 +88,7 @@ public class FileHandlerRunnable implements Runnable {
 
       // 异步压缩
       String innerEntryName = FileUtil.afterLastSlash(src);
-      compressFuture = compressAsynchronously(src, src, innerEntryName, fileCompresionMode);
+      compressFuture = compressAsynchronously(src, src, innerEntryName, fileCompresionMode, 60);
     }
 
     // 删除之前文件
@@ -110,7 +111,6 @@ public class FileHandlerRunnable implements Runnable {
       LOGGER.info("delete files before {} days", dayBefore);
       dayBefore++;
     }
-
   }
 
   /**
@@ -122,12 +122,32 @@ public class FileHandlerRunnable implements Runnable {
    * @return
    */
   public Future<?> compressAsynchronously(String nameOfFile2Compress, String nameOfCompressedFile,
-                                          String innerEntryName, String mode) {
+                                           String innerEntryName, String mode) {
     CompressionMode compressionMode = this.determineCompressionMode(mode);
     Compressor compressor = new Compressor(compressionMode);
     ExecutorService executor = Executors.newScheduledThreadPool(1);
     Future<?> future = executor.submit(new CompressionRunnable(compressor, nameOfFile2Compress,
-                                                         nameOfCompressedFile, innerEntryName));
+                                                           nameOfCompressedFile, innerEntryName));
+    executor.shutdown();
+    return future;
+  }
+
+  /**
+   * 可以延迟一定时间后进行压缩
+   * @param nameOfFile2Compress
+   * @param nameOfCompressedFile
+   * @param innerEntryName
+   * @param delay
+   * @return
+   */
+  public Future<?> compressAsynchronously(String nameOfFile2Compress, String nameOfCompressedFile,
+                                          String innerEntryName, String mode, long delay) {
+    CompressionMode compressionMode = this.determineCompressionMode(mode);
+    Compressor compressor = new Compressor(compressionMode);
+
+    ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+    Future<?> future = executor.schedule(new CompressionRunnable(compressor, nameOfFile2Compress,
+                                   nameOfCompressedFile, innerEntryName), delay, TimeUnit.SECONDS);
     executor.shutdown();
     return future;
   }
