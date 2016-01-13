@@ -88,16 +88,20 @@ public class FileHandlerRunnable implements Runnable {
       }
 
       // 异步压缩
-      String innerEntryName = FileUtil.afterLastSlash(src);
-      compressFuture = compressAsynchronously(src, src, innerEntryName, fileCompresionMode, 60);
+      if (needCompress()) {
+        String innerEntryName = FileUtil.afterLastSlash(src);
+        compressFuture = compressAsynchronously(src, src, innerEntryName, fileCompresionMode, 60);
+      }
     }
 
     // 删除之前文件
-    deleteFiles(logDir, filePrefix, fileCompresionMode, fileMaxHistory);
+    if (needDeletePastFile()) {
+      deleteFiles(logDir, filePrefix, fileCompresionMode, fileMaxHistory);
+    }
 
   }
 
-  public void deleteFiles(String path, String prefix, String suffix, int maxHistory) {
+  private void deleteFiles(String path, String prefix, String suffix, int maxHistory) {
     int dayBefore = maxHistory;
     while (true) {
       String filterDate = FlumeUtil.getDayBefore(dayBefore);
@@ -122,7 +126,7 @@ public class FileHandlerRunnable implements Runnable {
    * @param mode
    * @return
    */
-  public Future<?> compressAsynchronously(String nameOfFile2Compress, String nameOfCompressedFile,
+  private Future<?> compressAsynchronously(String nameOfFile2Compress, String nameOfCompressedFile,
                                            String innerEntryName, String mode) {
     CompressionMode compressionMode = this.determineCompressionMode(mode);
     Compressor compressor = new Compressor(compressionMode);
@@ -141,7 +145,7 @@ public class FileHandlerRunnable implements Runnable {
    * @param delay
    * @return
    */
-  public Future<?> compressAsynchronously(String nameOfFile2Compress, String nameOfCompressedFile,
+  private Future<?> compressAsynchronously(String nameOfFile2Compress, String nameOfCompressedFile,
                                           String innerEntryName, String mode, long delay) {
     CompressionMode compressionMode = this.determineCompressionMode(mode);
     Compressor compressor = new Compressor(compressionMode);
@@ -153,7 +157,7 @@ public class FileHandlerRunnable implements Runnable {
     return future;
   }
 
-  public CompressionMode determineCompressionMode(String fileCompressionMode) {
+  private CompressionMode determineCompressionMode(String fileCompressionMode) {
     CompressionMode compressionMode;
     if (StringUtils.equalsIgnoreCase(fileCompressionMode, "gz")) {
       compressionMode = CompressionMode.GZ;
@@ -165,7 +169,7 @@ public class FileHandlerRunnable implements Runnable {
     return compressionMode;
   }
 
-  public void waitForAsynchronousJobToStop() {
+  private void waitForAsynchronousJobToStop() {
     if(compressFuture != null) {
       try {
         compressFuture.get(30, TimeUnit.SECONDS);
@@ -175,6 +179,20 @@ public class FileHandlerRunnable implements Runnable {
         LOGGER.error("Unexpected exception while waiting for compression job to finish", e);
       }
     }
+  }
+
+  private boolean needCompress() {
+    if (StringUtils.equals(fileCompresionMode, "zip") || StringUtils.equals(fileCompresionMode, "gz")) {
+      return true;
+    }
+    return false;
+  }
+
+  private boolean needDeletePastFile() {
+    if (fileMaxHistory > 0) {
+      return true;
+    }
+    return false;
   }
 
 }
