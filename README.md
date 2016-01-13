@@ -49,9 +49,10 @@ a1.sources.r1.interceptors.i1.hdfsinterceptor.switch = true
 增加如下功能:
 1. 日志目录(logDir)与flume监控目录(spoolDir)分离
 2. 每小时将上一个小时的日志从`logDir`复制到`spoolDir`中
-3. 上报完成后对日志进行压缩, 可选`gz`和`zip`
-4. 自动删除N天前日志
-5. 日志文件名需要遵守一定格式,主要是时间, demo: "ChatServer-GroupChatBoard-v2-2015111014.log"
+3. 上报完成后对日志进行压缩, 可选`gz`和`zip`, 非此两种格式的不进行压缩
+4. 自动删除N天前日志, 如果天数小于等于0, 不进行删除
+5. 日志文件名需要遵守一定格式, 主要是时间, 可以设置时间DateFormat.
+示例: ChatServer-GroupChatBoard-v2-2015111014.log, dateFormat="yyyyMMddHH"
 
 配置示例:
 
@@ -67,9 +68,12 @@ a1.sources.r1.basenameHeaderKey = file
 # 整小时过多长时间后进行日志处理
 a1.sources.r1.rollMinutes = 1
 a1.sources.r1.filePrefix = fs-app-center-web-
-a1.sources.r1.fileCompressionMode = gz
-# 日志存放最长时间, 单位"天"
+# 日志压缩方式, 可选zip, gz, 其他不进行压缩
+a1.sources.r1.fileCompressionMode = zip
+# 日志存放最长时间, 单位"天", 小于等于0时不进行删除
 a1.sources.r1.fileMaxHistory = 7
+# 日志文件名中时间格式
+a1.sources.r1.dateFormat = yyyyMMddHH
 ```
 
 ### hdfs sink
