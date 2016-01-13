@@ -57,14 +57,21 @@ public class FlumeUtil {
     c.add(Calendar.HOUR, 1);
     c.set(Calendar.MINUTE, 0);
     c.set(Calendar.SECOND, 0);
-    long ss = c.getTimeInMillis() - System.currentTimeMillis();
-    return ss;
+    return c.getTimeInMillis() - System.currentTimeMillis();
   }
 
   public static String getLastHourWithDate() {
+    return getLastHourWithDate(dateWithHourFormat);
+  }
+
+  public static String getLastHourWithDate(String dateFormat) {
+    return getLastHourWithDate(new SimpleDateFormat(dateFormat));
+  }
+
+  public static String getLastHourWithDate(SimpleDateFormat format) {
     Calendar c = Calendar.getInstance();
     c.add(Calendar.HOUR, -1);
-    return dateWithHourFormat.format(c.getTime());
+    return format.format(c.getTime());
   }
 
   public static String getDayBefore(int day) {

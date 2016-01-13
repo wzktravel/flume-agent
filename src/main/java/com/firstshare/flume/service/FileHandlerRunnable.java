@@ -28,22 +28,23 @@ public class FileHandlerRunnable implements Runnable {
 
   private Future<?> compressFuture;
 
-  public String logDir;
-  public String spoolDir;
-  public String filePrefix;
-  public String completedSuffix;
-  public String fileCompresionMode;
-  public int fileMaxHistory;
+  private String logDir;
+  private String spoolDir;
+  private String filePrefix;
+  private String completedSuffix;
+  private String fileCompresionMode;
+  private int fileMaxHistory;
+  private String dateFormat;
 
-  public FileHandlerRunnable(String logDir, String spoolDir, String filePrefix,
-                             String completedSuffix, String fileCompresionMode, int fileMaxHistory) {
+  public FileHandlerRunnable(String logDir, String spoolDir, String filePrefix, String completedSuffix,
+                             String fileCompresionMode, int fileMaxHistory, String dateFormat) {
     this.logDir = logDir;
     this.spoolDir = spoolDir;
     this.filePrefix = filePrefix;
     this.completedSuffix = completedSuffix;
     this.fileCompresionMode = fileCompresionMode;
     this.fileMaxHistory = fileMaxHistory;
-
+    this.dateFormat = dateFormat;
   }
 
   /**
@@ -55,7 +56,7 @@ public class FileHandlerRunnable implements Runnable {
    */
   @Override
   public void run() {
-    String lastHourWithDate = FlumeUtil.getLastHourWithDate();
+    String lastHourWithDate = FlumeUtil.getLastHourWithDate(dateFormat);
     List<String> files = FileUtil.getFiles(logDir, filePrefix, completedSuffix, lastHourWithDate, false);
     if (files == null || files.size() < 1) {
       LOGGER.warn("No matched logs found in {}", logDir);

@@ -25,4 +25,8 @@ public class SpoolDirectoryHourlySourceConfigurationConstants
   public static final String FILE_MAXHISTORY = "fileMaxHistory";
   public static final int DEFAULT_FILE_MAXHISTORY = 5;
 
+  // 日志文件名的dateformat
+  public static final String FILE_DATEFORMAT = "fileDateFormat";
+  public static final String DEFAULT_FILE_DATEFORMAT = "yyyyMMdd-HH";
+
 }

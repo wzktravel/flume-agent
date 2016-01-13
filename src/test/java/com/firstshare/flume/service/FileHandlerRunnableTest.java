@@ -26,6 +26,7 @@ public class FileHandlerRunnableTest {
   public String filePrefix;
   public String completedSuffix;
   public String fileCompresionMode;
+  public String dateFormat;
 
   FileHandlerRunnable fileHandler;
 
@@ -36,9 +37,10 @@ public class FileHandlerRunnableTest {
     filePrefix = "test";
     completedSuffix = ".tmp";
     fileCompresionMode = "gz";
+    dateFormat = "yyyyMMddHH";
 
-    fileHandler = new FileHandlerRunnable(logDir, spoolDir, filePrefix,
-                                          completedSuffix, fileCompresionMode, 1);
+    fileHandler = new FileHandlerRunnable(logDir, spoolDir, filePrefix, completedSuffix,
+                                          fileCompresionMode, 1, dateFormat);
   }
 
   @Test

@@ -67,6 +67,7 @@ public class SpoolDirectoryHourlySource extends AbstractSource
   private int rollMinutes;
   private String fileCompressionMode;
   private int fileMaxHistory;
+  private String dateFormat;
 
   private volatile boolean hasFatalError = false;
 
@@ -111,7 +112,7 @@ public class SpoolDirectoryHourlySource extends AbstractSource
 
     long millisecondsToNextHour = FlumeUtil.getMilliSecondsToNextHour() + rollMinutes * 60 * 1000;
     fileHandler = new FileHandlerRunnable(logDir, spoolDirectory, filePrefix, completedSuffix,
-                                          fileCompressionMode, fileMaxHistory);
+                                          fileCompressionMode, fileMaxHistory, dateFormat);
     fileHandleExcutor.scheduleAtFixedRate(fileHandler, millisecondsToNextHour,
                                                ROLL_DELAY_MS, TimeUnit.MILLISECONDS);
 
@@ -195,6 +196,7 @@ public class SpoolDirectoryHourlySource extends AbstractSource
     rollMinutes = context.getInteger(ROLL_MINUTES, DEFAULT_ROOL_MINUTES);
     fileCompressionMode = context.getString(FILE_COMPRESSIONMODE, DEFAULT_FILE_COMPRESSIONMODE);
     fileMaxHistory = context.getInteger(FILE_MAXHISTORY, DEFAULT_FILE_MAXHISTORY);
+    dateFormat = context.getString(FILE_DATEFORMAT, DEFAULT_FILE_DATEFORMAT);
   }
 
   @VisibleForTesting
