@@ -34,17 +34,17 @@ public class FileHandlerRunnable implements Runnable {
   private String completedSuffix;
   private String fileCompresionMode;
   private int fileMaxHistory;
-  private String dateFormat;
+  private String fileDateFormat;
 
   public FileHandlerRunnable(String logDir, String spoolDir, String filePrefix, String completedSuffix,
-                             String fileCompresionMode, int fileMaxHistory, String dateFormat) {
+                             String fileCompresionMode, int fileMaxHistory, String fileDateFormat) {
     this.logDir = logDir;
     this.spoolDir = spoolDir;
     this.filePrefix = filePrefix;
     this.completedSuffix = completedSuffix;
     this.fileCompresionMode = fileCompresionMode;
     this.fileMaxHistory = fileMaxHistory;
-    this.dateFormat = dateFormat;
+    this.fileDateFormat = fileDateFormat;
   }
 
   /**
@@ -56,10 +56,10 @@ public class FileHandlerRunnable implements Runnable {
    */
   @Override
   public void run() {
-    String lastHourWithDate = FlumeUtil.getLastHourWithDate(dateFormat);
+    String lastHourWithDate = FlumeUtil.getLastHourWithDate(fileDateFormat);
     List<String> files = FileUtil.getFiles(logDir, filePrefix, completedSuffix, lastHourWithDate, false);
     if (files == null || files.size() < 1) {
-      LOGGER.warn("No matched logs found in {}", logDir);
+      LOGGER.warn("No matched logs found in {}, fileDateFormat={}", logDir, fileDateFormat);
       return;
     }
     for (String file : files) {
@@ -101,7 +101,7 @@ public class FileHandlerRunnable implements Runnable {
 
   }
 
-  private void deleteFiles(String path, String prefix, String suffix, int maxHistory) {
+  public void deleteFiles(String path, String prefix, String suffix, int maxHistory) {
     int dayBefore = maxHistory;
     while (true) {
       String filterDate = FlumeUtil.getDayBefore(dayBefore);
@@ -126,7 +126,7 @@ public class FileHandlerRunnable implements Runnable {
    * @param mode
    * @return
    */
-  private Future<?> compressAsynchronously(String nameOfFile2Compress, String nameOfCompressedFile,
+  public Future<?> compressAsynchronously(String nameOfFile2Compress, String nameOfCompressedFile,
                                            String innerEntryName, String mode) {
     CompressionMode compressionMode = this.determineCompressionMode(mode);
     Compressor compressor = new Compressor(compressionMode);
@@ -169,7 +169,7 @@ public class FileHandlerRunnable implements Runnable {
     return compressionMode;
   }
 
-  private void waitForAsynchronousJobToStop() {
+  public void waitForAsynchronousJobToStop() {
     if(compressFuture != null) {
       try {
         compressFuture.get(30, TimeUnit.SECONDS);

@@ -73,7 +73,7 @@ a1.sources.r1.fileCompressionMode = zip
 # 日志存放最长时间, 单位"天", 小于等于0时不进行删除
 a1.sources.r1.fileMaxHistory = 7
 # 日志文件名中时间格式
-a1.sources.r1.dateFormat = yyyyMMddHH
+a1.sources.r1.fileDateFormat = yyyyMMddHH
 ```
 
 ### hdfs sink
