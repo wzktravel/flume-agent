@@ -60,6 +60,15 @@ public class FlumeUtil {
     return c.getTimeInMillis() - System.currentTimeMillis();
   }
 
+  public static long getMilliSecondsToNextDay() {
+    Calendar c = Calendar.getInstance();
+    c.add(Calendar.DATE, 1);
+    c.set(Calendar.HOUR_OF_DAY, 0);
+    c.set(Calendar.MINUTE, 0);
+    c.set(Calendar.SECOND, 0);
+    return c.getTimeInMillis() - System.currentTimeMillis();
+  }
+
   public static String getLastHourWithDate() {
     return getLastHourWithDate(dateWithHourFormat);
   }
@@ -69,10 +78,27 @@ public class FlumeUtil {
   }
 
   public static String getLastHourWithDate(SimpleDateFormat format) {
+    return getFormatTime(format, "hour", -1);
+  }
+
+  public static String getLastDayWithDate(String format) {
+    return getLastDayWithDate(new SimpleDateFormat(format));
+  }
+
+  public static String getLastDayWithDate(SimpleDateFormat format) {
+    return getFormatTime(format, "day", -1);
+  }
+
+  public static String getFormatTime(SimpleDateFormat format, String unit, int amount) {
     Calendar c = Calendar.getInstance();
-    c.add(Calendar.HOUR, -1);
+    if (StringUtils.equals(unit, "day")) {
+      c.add(Calendar.DATE, amount);
+    } else if (StringUtils.equals(unit, "hour")) {
+      c.add(Calendar.DATE, amount);
+    }
     return format.format(c.getTime());
   }
+
 
   public static String getDayBefore(int day) {
     Calendar c = Calendar.getInstance();

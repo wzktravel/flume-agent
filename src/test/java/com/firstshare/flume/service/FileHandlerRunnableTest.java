@@ -40,7 +40,7 @@ public class FileHandlerRunnableTest {
     dateFormat = "yyyyMMddHH";
 
     fileHandler = new FileHandlerRunnable(logDir, spoolDir, filePrefix, completedSuffix,
-                                          fileCompresionMode, 1, dateFormat);
+                                          fileCompresionMode, 1, dateFormat, "hour");
   }
 
   @Test

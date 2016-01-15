@@ -13,6 +13,10 @@ public class SpoolDirectoryHourlySourceConfigurationConstants
   public static final String FILE_PREFIX = "filePrefix";
   public static final String DEFAULT_FILE_PREFIX = "";
 
+  // 日志按天还是按小时进行上报
+  public static final String ROLL_UNIT = "rollUnit";
+  public static final String DEFAULT_ROLL_UNIT = "hour";
+
   // 过整点多长时间将日志拷贝到spoolDir
   public static final String ROLL_MINUTES = "rollMinutes";
   public static final int DEFAULT_ROOL_MINUTES = 1;

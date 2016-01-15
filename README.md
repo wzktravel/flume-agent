@@ -65,6 +65,8 @@ a1.sources.r1.ignorePattern = ^(.)*\\.tmp$
 a1.sources.r1.deletePolicy = immediate
 a1.sources.r1.basenameHeader = true
 a1.sources.r1.basenameHeaderKey = file
+# 按天还是按小时进行上报
+a1.sources.r1.rollUnit = hour
 # 整小时过多长时间后进行日志处理
 a1.sources.r1.rollMinutes = 1
 a1.sources.r1.filePrefix = fs-app-center-web-

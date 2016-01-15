@@ -71,4 +71,14 @@ public class FlumeUtilTest {
     String day = FlumeUtil.getDayBefore(7);
     System.out.println(day);
   }
+
+  @Test
+  public void testGetMilliSecondsToNextDay() throws Exception {
+    long milliseconds = FlumeUtil.getMilliSecondsToNextDay();
+    System.out.println(milliseconds);
+    long minutes = milliseconds / 1000 / 60;
+    System.out.println(minutes);
+    System.out.println((double) minutes / 60);
+  }
+
 }

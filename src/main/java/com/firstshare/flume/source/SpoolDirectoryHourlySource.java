@@ -7,6 +7,7 @@ import com.google.common.base.Throwables;
 import com.firstshare.flume.service.FileHandlerRunnable;
 import com.firstshare.flume.utils.FlumeUtil;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.flume.ChannelException;
 import org.apache.flume.Context;
 import org.apache.flume.Event;
@@ -45,7 +46,9 @@ public class SpoolDirectoryHourlySource extends AbstractSource
   // Delay used when polling for new files
   private static final int POLL_DELAY_MS = 500;
   // 每小时执行一次,将日志从logDir拷贝到spoolDirectory
-  private static final int ROLL_DELAY_MS = 60 * 60 * 1000;
+  private static final int ROLL_DELAY_HOUR = 60 * 60 * 1000;
+  // 每天执行一次
+  private static final int ROLL_DELAY_DAY = 24 * 60 * 60 * 1000;
 
   /* Config options */
   private String completedSuffix;
@@ -64,6 +67,7 @@ public class SpoolDirectoryHourlySource extends AbstractSource
   private DecodeErrorPolicy decodeErrorPolicy;
   private String logDir;
   private String filePrefix;
+  private String rollUnit;
   private int rollMinutes;
   private String fileCompressionMode;
   private int fileMaxHistory;
@@ -110,11 +114,15 @@ public class SpoolDirectoryHourlySource extends AbstractSource
       throw new FlumeException("Error instantiating spooling event parser", ioe);
     }
 
-    long millisecondsToNextHour = FlumeUtil.getMilliSecondsToNextHour() + rollMinutes * 60 * 1000;
     fileHandler = new FileHandlerRunnable(logDir, spoolDirectory, filePrefix, completedSuffix,
-                                          fileCompressionMode, fileMaxHistory, dateFormat);
-    fileHandleExcutor.scheduleAtFixedRate(fileHandler, millisecondsToNextHour,
-                                               ROLL_DELAY_MS, TimeUnit.MILLISECONDS);
+                                        fileCompressionMode, fileMaxHistory, dateFormat, rollUnit);
+    if (StringUtils.equals(rollUnit, "day")) {
+      long millisecondsToNextDay = FlumeUtil.getMilliSecondsToNextDay() + rollMinutes * 60 * 1000;
+      fileHandleExcutor.scheduleAtFixedRate(fileHandler, millisecondsToNextDay, ROLL_DELAY_DAY, TimeUnit.MILLISECONDS);
+    } else {
+      long millisecondsToNextHour = FlumeUtil.getMilliSecondsToNextHour() + rollMinutes * 60 * 1000;
+      fileHandleExcutor.scheduleAtFixedRate(fileHandler, millisecondsToNextHour, ROLL_DELAY_HOUR, TimeUnit.MILLISECONDS);
+    }
 
     Runnable runner = new SpoolDirectoryRunnable(reader, sourceCounter);
     executor.scheduleWithFixedDelay(runner, 0, POLL_DELAY_MS, TimeUnit.MILLISECONDS);
@@ -193,6 +201,7 @@ public class SpoolDirectoryHourlySource extends AbstractSource
     }
 
     filePrefix = context.getString(FILE_PREFIX, DEFAULT_FILE_PREFIX);
+    rollUnit = context.getString(ROLL_UNIT, DEFAULT_ROLL_UNIT);
     rollMinutes = context.getInteger(ROLL_MINUTES, DEFAULT_ROOL_MINUTES);
     fileCompressionMode = context.getString(FILE_COMPRESSIONMODE, DEFAULT_FILE_COMPRESSIONMODE);
     fileMaxHistory = context.getInteger(FILE_MAXHISTORY, DEFAULT_FILE_MAXHISTORY);
