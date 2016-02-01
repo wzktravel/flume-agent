@@ -21,8 +21,7 @@ public class FlumeUtil {
 
   private static final SimpleDateFormat dateWithHourFormat = new SimpleDateFormat("yyyyMMddHH");
   private static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd");
-  private static final Pattern datePattern = Pattern.compile("\\d{4}\\d{2}\\d{2}\\d{2}");
-
+  private static final Pattern datePattern = Pattern.compile("\\d{4}-?\\d{2}-?\\d{2}-?\\d{0,2}");
 
   public static String getFileDate(String filename) {
     String date = "";
@@ -69,6 +68,16 @@ public class FlumeUtil {
     return c.getTimeInMillis() - System.currentTimeMillis();
   }
 
+  public static Calendar getCalendar(String unit, int amount) {
+    Calendar c = Calendar.getInstance();
+    if (StringUtils.equals(unit, "day")) {
+      c.add(Calendar.DATE, amount);
+    } else if (StringUtils.equals(unit, "hour")) {
+      c.add(Calendar.DATE, amount);
+    }
+    return c;
+  }
+
   public static String getLastHourWithDate() {
     return getLastHourWithDate(dateWithHourFormat);
   }
@@ -90,15 +99,9 @@ public class FlumeUtil {
   }
 
   public static String getFormatTime(SimpleDateFormat format, String unit, int amount) {
-    Calendar c = Calendar.getInstance();
-    if (StringUtils.equals(unit, "day")) {
-      c.add(Calendar.DATE, amount);
-    } else if (StringUtils.equals(unit, "hour")) {
-      c.add(Calendar.DATE, amount);
-    }
+    Calendar c = getCalendar(unit, amount);
     return format.format(c.getTime());
   }
-
 
   public static String getDayBefore(int day) {
     Calendar c = Calendar.getInstance();
