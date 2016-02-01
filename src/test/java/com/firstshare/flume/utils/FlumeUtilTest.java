@@ -1,6 +1,5 @@
 package com.firstshare.flume.utils;
 
-import org.apache.commons.lang.StringUtils;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -104,6 +103,13 @@ public class FlumeUtilTest {
     long minutes = milliseconds / 1000 / 60;
     System.out.println(minutes);
     System.out.println((double) minutes / 60);
+  }
+
+  @Test
+  public void testGetLastHourWithDate() throws Exception {
+    String aFormat = "yyyy-MM-dd-HH";
+    String d = FlumeUtil.getLastHourWithDate(aFormat);
+    System.out.println(d);
   }
 
 }

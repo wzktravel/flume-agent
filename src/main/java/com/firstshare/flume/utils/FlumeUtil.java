@@ -73,7 +73,7 @@ public class FlumeUtil {
     if (StringUtils.equals(unit, "day")) {
       c.add(Calendar.DATE, amount);
     } else if (StringUtils.equals(unit, "hour")) {
-      c.add(Calendar.DATE, amount);
+      c.add(Calendar.HOUR_OF_DAY, amount);
     }
     return c;
   }
