@@ -40,7 +40,8 @@ plugins.d/hadoop-lzo/native/libgplcompression.so.0.0.0
 ```
 a1.sources.r1.interceptors = i1
 a1.sources.r1.interceptors.i1.type = com.firstshare.flume.interceptor.HDFSInterceptor$Builder
-a1.sources.r1.interceptors.i1.hdfsinterceptor.switch = true
+a1.sources.r1.interceptors.i1.switch = true
+a1.sources.r1.interceptors.i1.fileDateFormat = yyyyMMdd
 ```
 
 ### Source
