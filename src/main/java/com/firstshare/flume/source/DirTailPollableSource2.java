@@ -1,10 +1,10 @@
 package com.firstshare.flume.source;
 
-import com.google.common.base.Splitter;
+import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 
-import com.firstshare.flume.api.IFileListener;
 import com.firstshare.flume.service.WatchServiceFilter;
+import com.firstshare.flume.utils.IpUtils;
 import com.firstshare.flume.watcher.FileModifyWatcher;
 
 import org.apache.flume.Context;
@@ -39,12 +39,13 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class DirTailPollableSource2 extends AbstractSource implements Configurable, PollableSource {
 
   private static final Logger logger = LoggerFactory.getLogger(DirTailPollableSource2.class);
-  private static final char SPLITER = '\u0001';
+  private static final char SPLITTER = '\u0001';
 
   private String path;
   private String filePrefix;
   private boolean debugThroughput;
   private String appName;
+  private String serverIp;
 
   private Timer throughputTimer;
 
@@ -65,8 +66,9 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
     filePrefix = context.getString("filePrefix", "");
     this.debugThroughput = context.getBoolean("debugThroughput", false);
     this.appName = context.getString("appName", "");
+    this.serverIp = IpUtils.scanServerInnerIP();
 
-    this.queue = new LinkedBlockingQueue<String>();
+    this.queue = new LinkedBlockingQueue<>();
   }
 
   @Override
@@ -78,18 +80,15 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
 
     Path watchPath = Paths.get(path);
     FileModifyWatcher watcher = FileModifyWatcher.newInstance();
-    watcher.watch(watchPath, new WatchServiceFilter(filePrefix), new IFileListener() {
-      @Override
-      public void changed(Path path) {
-        File newLastModifiedFile = path.toFile();
-        if (lastModifiedFile == null || !newLastModifiedFile.getPath()
-            .equals(lastModifiedFile.getPath())) {
-          lastModifiedFile = newLastModifiedFile;
-          if (lastModifiedFile != null && lastModifiedFile.exists()) {
-            logger.info("Thread {} detected new last modified file: {}",
-                        Thread.currentThread().getName(), lastModifiedFile.getPath());
-            restart();
-          }
+    watcher.watch(watchPath, new WatchServiceFilter(filePrefix), listener -> {
+      File newLastModifiedFile = listener.toFile();
+      if (lastModifiedFile == null || !newLastModifiedFile.getPath()
+          .equals(lastModifiedFile.getPath())) {
+        lastModifiedFile = newLastModifiedFile;
+        if (lastModifiedFile != null && lastModifiedFile.exists()) {
+          logger.info("Thread {} detected new last modified file: {}",
+                      Thread.currentThread().getName(), lastModifiedFile.getPath());
+          restart();
         }
       }
     });
@@ -123,7 +122,7 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
       try {
         throughputTimer.cancel();
       } catch (Exception e) {
-
+        logger.error("Cannot cancel timer. ", e);
       } finally {
         throughputTimer = null;
       }
@@ -151,9 +150,11 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
     try {
       String line = queue.take();
       if (!Strings.isNullOrEmpty(appName)) {
-        line += (SPLITER + appName);
+        line += (SPLITTER + appName);
       }
+      String key = Joiner.on(SPLITTER).join(serverIp, appName);
       Event e = EventBuilder.withBody(line.getBytes());
+      e.getHeaders().put("key", key);
       channelProcessor.processEvent(e);
     } catch (Throwable t) {
       status = Status.BACKOFF;
@@ -175,7 +176,7 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
         randomFile = new RandomAccessFile(lastModifiedFile, "r");
         randomFile.seek(randomFile.length());
 
-        String line = null;
+        String line;
         while (run) {
           line = randomFile.readLine();
           if (line == null) {
@@ -192,6 +193,7 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
           try {
             randomFile.close();
           } catch (IOException e1) {
+            logger.error("Cannot close RandomAccessFile {}", lastModifiedFile, e1);
           }
         }
       }
