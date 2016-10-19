@@ -48,6 +48,7 @@ a1.sources.r1.interceptors.i1.fileDateFormat = yyyyMMdd
 使用`com.firstshare.flume.source.SpoolDirectoryHourlySource`, 基于`SpoolDirectorySource`修改.
 
 增加如下功能:
+
 1. 日志目录(logDir)与flume监控目录(spoolDir)分离
 2. 每小时将上一个小时的日志从`logDir`复制到`spoolDir`中
 3. 上报完成后对日志进行压缩, 可选`gz`和`zip`, 非此两种格式的不进行压缩
@@ -95,6 +96,7 @@ plugins.d/hadoop/lib/htrace-core-3.0.4.jar
 ### 上报hdfs所需其他配置
 
 #### 上报时使用lzo压缩
+
 1. 确保cloudera中已经激活hadoop_lzo的parcel，并且hdfs/yarn也支持lzo。安装步骤参见Cloudera配置hadoop_lzo
 2. 手工编译lzo和hadoop-lzo的，直接将jar包放在plugins.d下。使用Cloudera安装hadoop-lzo parcel的，要将hadoop_lzo的jar包和native下库连接都放在plugins.d下。
 3. 从hadoop集群上拉取`core-site.xml`放在`flume/conf`下，确保`io.compression.codecs`中存在`com.hadoop.compression.lzo.LzoCodec`和`com.hadoop.compression.lzo.LzopCodec`
@@ -121,18 +123,19 @@ a1.sinks.hdfs-sink.hdfs.codeC = com.hadoop.compression.lzo.LzopCodec
 a1.sinks.hdfs-sink.hdfs.path = /facishare-data/app/center/web/%{year}/%{month}/%{day}/
 ```
 
-更多flume上报hdfs的内容可以参考[http://wiki.firstshare.cn/pages/viewpage.action?pageId=18645082](http://wiki.firstshare.cn/pages/viewpage.action?pageId=18645082)
-
 ## flume上报到kafka
 
-### Interceptor
+### Source
 
 使用`com.firstshare.flume.source.DirTailPollableSource2`, 能够动态tail目录下最后修改的文件
 
 功能:
-1. 根据`filePrefix`监控目录下最新修改的文件进行tail, 能够自动切换
-2. 在每行日志最后添加`appName`供oss使用, 中间使用'\u0001'隔断.
-3. 需要监控多个目录或不同前缀的文件,需要配置多个source, 各source之间相互不影响
+
+1. 根据`filePrefix`监控目录下最新修改的文件进行tail, 能够自动切换。
+2. 在每行日志最后添加`appName`供oss使用, 中间使用'\u0001'隔断。
+3. 需要监控多个目录或不同前缀的文件,需要配置多个source, 各source之间相互不影响。
+4. 发送到kafka的日志key中包含flume所在机器ip, 方便按机器进行处理。
+5. 健壮性强, 当网络或kafka抖动时, 等待2^N毫秒重试。
 
 配置示例:
 
@@ -141,4 +144,8 @@ a1.sources.r1.type = com.firstshare.flume.source.DirTailPollableSource2
 a1.sources.r1.path = /opt/ngx_log
 a1.sources.r1.filePrefix = www.fxk-
 a1.sources.r1.appName = nginx-fxk
+# 最长等待时间
+a1.sources.r1.maxBackOff = 5000
+# 从文件tail的最大队列长度
+a1.sources.r1.queueSize = 10000
 ```
