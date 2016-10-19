@@ -7,6 +7,7 @@ import com.firstshare.flume.service.WatchServiceFilter;
 import com.firstshare.flume.utils.IpUtils;
 import com.firstshare.flume.watcher.FileModifyWatcher;
 
+import org.apache.flume.ChannelException;
 import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.EventDeliveryException;
@@ -24,8 +25,8 @@ import java.io.RandomAccessFile;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 使用WatchService监测目录下最新的文件
@@ -43,7 +44,6 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
 
   private String path;
   private String filePrefix;
-  private boolean debugThroughput;
   private String appName;
   private String serverIp;
 
@@ -53,8 +53,7 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
   private boolean run;
 
   private File lastModifiedFile;
-  private long totalCount;
-  private long throughput;
+  private int maxBackOff;
 
   private ChannelProcessor channelProcessor;
 
@@ -64,11 +63,12 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
   public void configure(Context context) {
     this.path = context.getString("path", "/tmp");
     filePrefix = context.getString("filePrefix", "");
-    this.debugThroughput = context.getBoolean("debugThroughput", false);
     this.appName = context.getString("appName", "");
-    this.serverIp = IpUtils.scanServerInnerIP();
+    this.maxBackOff = context.getInteger("maxBackOff", 4000);
 
-    this.queue = new LinkedBlockingQueue<>();
+    int queueSize = context.getInteger("queueSize", 10000);
+    this.queue = new LinkedBlockingQueue<>(queueSize);
+    this.serverIp = IpUtils.scanServerInnerIP();
   }
 
   @Override
@@ -92,19 +92,6 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
         }
       }
     });
-
-    if (debugThroughput) {
-      throughputTimer = new Timer("throughputTimerThread", true);
-      throughputTimer.scheduleAtFixedRate(new TimerTask() {
-        long beforeTotalCount = 0;
-
-        public void run() {
-          throughput = totalCount - beforeTotalCount;
-          logger.info("totalCount= {}, throughput= {}", totalCount, throughput);
-          beforeTotalCount = totalCount;
-        }
-      }, 0L, 1000);
-    }
 
     logger.info("{} is started successfully.", this.getClass().getSimpleName());
   }
@@ -146,16 +133,32 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
   @Override
   public Status process() throws EventDeliveryException {
     Status status = Status.READY;
-    channelProcessor = getChannelProcessor();
+    int backOffInterval = 250;
     try {
+      channelProcessor = getChannelProcessor();
       String line = queue.take();
       if (!Strings.isNullOrEmpty(appName)) {
         line += (SPLITTER + appName);
       }
       String key = Joiner.on(SPLITTER).join(serverIp, appName);
-      Event e = EventBuilder.withBody(line.getBytes());
-      e.getHeaders().put("key", key);
-      channelProcessor.processEvent(e);
+      Event event = EventBuilder.withBody(line.getBytes());
+      event.getHeaders().put("key", key);
+      while (!Thread.interrupted()) {
+        try {
+          channelProcessor.processEvent(event);
+        } catch (ChannelException ex) {
+          logger.warn("The channel is full, and cannot write data now. The " +
+                      "source will try again after " + String.valueOf(backOffInterval) +
+                      " milliseconds");
+
+          TimeUnit.MILLISECONDS.sleep(backOffInterval);
+          backOffInterval = backOffInterval << 1;
+          backOffInterval = backOffInterval >= maxBackOff ? maxBackOff :
+                            backOffInterval;
+          continue;
+        }
+        break;
+      }
     } catch (Throwable t) {
       status = Status.BACKOFF;
       // re-throw all Errors
@@ -172,6 +175,7 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
 
     @Override
     public void run() {
+      int backOffInterval = 250;
       try {
         randomFile = new RandomAccessFile(lastModifiedFile, "r");
         randomFile.seek(randomFile.length());
@@ -180,11 +184,24 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
         while (run) {
           line = randomFile.readLine();
           if (line == null) {
-            Thread.sleep(10);
+            TimeUnit.MILLISECONDS.sleep(10);
             continue;
           }
-          queue.offer(line);
-          totalCount++;
+          while (!Thread.interrupted()) {
+            boolean offer = queue.offer(line);
+            if (!offer) {
+              logger.warn("The queue is full, and cannot write data now. Will try again after "
+                          + String.valueOf(backOffInterval) + " milliseconds");
+
+              TimeUnit.MILLISECONDS.sleep(backOffInterval);
+              backOffInterval = backOffInterval << 1;
+              backOffInterval = backOffInterval >= maxBackOff ? maxBackOff :
+                                backOffInterval;
+              continue;
+            }
+            backOffInterval = 250;
+            break;
+          }
         }
       } catch (Exception e) {
         Thread.currentThread().interrupt();
