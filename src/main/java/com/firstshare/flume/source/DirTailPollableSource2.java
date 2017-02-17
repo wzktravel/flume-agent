@@ -59,6 +59,8 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
 
   private LinkedBlockingQueue<String> queue;
 
+  private RandomAccessFile randomFile;
+
   @Override
   public void configure(Context context) {
     this.path = context.getString("path", "/tmp");
@@ -72,7 +74,7 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
   }
 
   @Override
-  public void start() {
+  public synchronized void start() {
 
     logger.info("{} is starting..................", this.getClass().getSimpleName());
 
@@ -98,13 +100,10 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
 
 
   @Override
-  public void stop() {
+  public synchronized void stop() {
     channelProcessor.close();
     run = false;
-    if (tailThread != null) {
-      tailThread.interrupt();
-    }
-
+    interruptThread();
     if (throughputTimer != null) {
       try {
         throughputTimer.cancel();
@@ -120,14 +119,26 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
 
   private void restart() {
     run = false;
-    if (tailThread != null) {
-      tailThread.interrupt();
-    }
+    interruptThread();
     run = true;
     TailRunner tailRunner = new TailRunner();
     tailThread = new Thread(tailRunner);
     tailThread.setDaemon(true);
     tailThread.start();
+  }
+
+  private void interruptThread() {
+    if (randomFile != null) {
+      try {
+        logger.info("Try to close file {}", randomFile);
+        randomFile.close();
+      } catch (IOException e1) {
+        logger.error("Cannot close RandomAccessFile {}", randomFile, e1);
+      }
+    }
+    if (tailThread != null) {
+      tailThread.interrupt();
+    }
   }
 
   @Override
@@ -170,9 +181,6 @@ public class DirTailPollableSource2 extends AbstractSource implements Configurab
   }
 
   private class TailRunner implements Runnable {
-
-    private RandomAccessFile randomFile;
-
     @Override
     public void run() {
       int backOffInterval = 250;
